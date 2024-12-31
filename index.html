@@ -117,6 +117,21 @@
             .clear-logs:hover {
                 background-color: #c0392b;
             }
+
+            .toggle-connection {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-bottom: 20px;
+                margin-left: 10px;
+            }
+
+            .toggle-connection:hover {
+                background-color: #2980b9;
+            }
         </style>
     </head>
     <body>
@@ -139,12 +154,22 @@
 
             <button class="clear-logs" onclick="clearLogs()">Clear Logs</button>
 
+            <button
+                class="toggle-connection"
+                id="toggle-connection"
+                onclick="toggleConnection()"
+            >
+                Disconnect
+            </button>
+
             <div class="logs-container" id="logs">
                 <!-- Logs will be inserted here -->
             </div>
         </div>
 
         <script>
+            const { ipcRenderer } = require("electron");
+
             let clientId = null;
 
             function setClientId(id) {
@@ -189,6 +214,14 @@
                 statusText.textContent = `WebSocket server is ${
                     isOnline ? "running" : "not running"
                 } on port 8765`;
+            }
+
+            async function toggleConnection() {
+                const button = document.getElementById("toggle-connection");
+                const isConnected = await ipcRenderer.invoke(
+                    "toggle-connection"
+                );
+                button.textContent = isConnected ? "Disconnect" : "Connect";
             }
         </script>
     </body>

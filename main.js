@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const WebSocket = require('ws');
 const { exec } = require('child_process');
 const { machineIdSync } = require('node-machine-id');
@@ -8,6 +8,7 @@ const { machineIdSync } = require('node-machine-id');
 let mainWindow;
 let ws;
 const CLIENT_ID = machineIdSync(); 
+let isConnected = false;
 
 
 function createWindow() {
@@ -29,11 +30,15 @@ function createWindow() {
 
 
 function connectToServer() {
+    if (isConnected) return;
+    
     ws = new WebSocket(`ws://localhost:8000/ws/${CLIENT_ID}`);
+    isConnected = true;
 
     ws.on('open', () => {
         console.log('Connected to FastAPI server');
         mainWindow.webContents.executeJavaScript('updateStatus(true)');
+        mainWindow.webContents.executeJavaScript('document.getElementById("toggle-connection").textContent = "Disconnect"');
     });
 
     ws.on('message', function incoming(message) {
@@ -75,9 +80,13 @@ function connectToServer() {
     });
 
     ws.on('close', () => {
+        isConnected = false;
         mainWindow.webContents.executeJavaScript('updateStatus(false)');
-        // Attempt to reconnect after a delay
-        setTimeout(connectToServer, 5000);
+        mainWindow.webContents.executeJavaScript('document.getElementById("toggle-connection").textContent = "Connect"');
+        // Only attempt reconnect if connection wasn't manually stopped
+        if (ws.intentionalClose !== true) {
+            setTimeout(connectToServer, 5000);
+        }
     });
 
     ws.on('error', (error) => {
@@ -85,6 +94,26 @@ function connectToServer() {
         mainWindow.webContents.executeJavaScript('updateStatus(false)');
     });
 }
+
+function disconnectFromServer() {
+    if (!ws || !isConnected) return;
+    
+    ws.intentionalClose = true;  // Flag to prevent auto-reconnect
+    ws.close();
+    isConnected = false;
+    mainWindow.webContents.executeJavaScript('document.getElementById("toggle-connection").textContent = "Connect"');
+}
+
+// Add IPC handlers for renderer communication
+ipcMain.handle('toggle-connection', async () => {
+    if (isConnected) {
+        disconnectFromServer();
+        return false;
+    } else {
+        connectToServer();
+        return true;
+    }
+});
 
 app.whenReady().then(() => {
     createWindow();
